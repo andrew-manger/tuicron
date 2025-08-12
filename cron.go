@@ -231,20 +231,20 @@ func CreateSampleLogFile(logFile string) {
         switch logFile {
         case "backup":
                 entries = []string{
-                        fmt.Sprintf("%s - Starting job: /home/user/scripts/backup.sh", now.Add(-25*time.Hour).Format("2006-01-02 15:04:05")),
+                        fmt.Sprintf("%s - Starting job", now.Add(-25*time.Hour).Format("2006-01-02 15:04:05")),
                         fmt.Sprintf("%s - Backup started", now.Add(-25*time.Hour).Format("2006-01-02 15:04:05")),
                         fmt.Sprintf("%s - Copying files...", now.Add(-25*time.Hour).Format("2006-01-02 15:04:05")),
                         fmt.Sprintf("%s - Backup completed successfully", now.Add(-25*time.Hour).Format("2006-01-02 15:04:05")),
                 }
         case "system_update":
                 entries = []string{
-                        fmt.Sprintf("%s - Starting job: sudo apt update && sudo apt upgrade -y", now.Add(-168*time.Hour).Format("2006-01-02 15:04:05")),
+                        fmt.Sprintf("%s - Starting job", now.Add(-168*time.Hour).Format("2006-01-02 15:04:05")),
                         fmt.Sprintf("%s - Reading package lists...", now.Add(-168*time.Hour).Format("2006-01-02 15:04:05")),
                         fmt.Sprintf("%s - All packages are up to date", now.Add(-168*time.Hour).Format("2006-01-02 15:04:05")),
                 }
         case "cleanup":
                 entries = []string{
-                        fmt.Sprintf("%s - Starting job: find /tmp -type f -mtime +1 -delete", now.Add(-1*time.Hour).Format("2006-01-02 15:04:05")),
+                        fmt.Sprintf("%s - Starting job", now.Add(-1*time.Hour).Format("2006-01-02 15:04:05")),
                         fmt.Sprintf("%s - Cleaned 5 temporary files", now.Add(-1*time.Hour).Format("2006-01-02 15:04:05")),
                 }
         default:
@@ -354,18 +354,18 @@ func AddLoggingToCommand(command, logFile string) string {
         logPath := fmt.Sprintf("%s/.cron_history/%s.log", homeDir, logFile)
         
         // Add timestamp and redirect output, preserving the original command
-        return fmt.Sprintf("(echo \"$(date +'%%Y-%%m-%%d %%H:%%M:%%S') - Starting job: %s\" && %s) >> %s 2>&1", command, command, logPath)
+        return fmt.Sprintf("(echo \"$(date +'%%Y-%%m-%%d %%H:%%M:%%S') - Starting job\" && %s) >> %s 2>&1", command, logPath)
 }
 
 // StripLoggingFromCommand removes logging redirection from a command for display
 func StripLoggingFromCommand(command string) string {
         // Handle new format: (echo "..." && command) >> logfile 2>&1
-        if strings.HasPrefix(command, "(echo") && strings.Contains(command, "Starting job:") {
-                // Extract the command from: Starting job: actual_command"
-                startIdx := strings.Index(command, "Starting job: ")
-                if startIdx != -1 {
-                        startIdx += len("Starting job: ")
-                        endIdx := strings.Index(command[startIdx:], "\"")
+        if strings.HasPrefix(command, "(echo") && strings.Contains(command, "Starting job") {
+                // Extract the command after "&&" and before ">>"
+                andIdx := strings.Index(command, " && ")
+                if andIdx != -1 {
+                        startIdx := andIdx + 4 // Skip past " && "
+                        endIdx := strings.Index(command[startIdx:], ") >>")
                         if endIdx != -1 {
                                 return strings.TrimSpace(command[startIdx : startIdx+endIdx])
                         }
