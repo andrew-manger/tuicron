@@ -10,6 +10,7 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
 - **ui.go**: Main UI logic using Bubbletea framework with multiple view modes
 - **cron.go**: Cron job parsing, validation, and system interaction
 - **logs.go**: System log parsing for job execution history
+- **history.go**: Custom history tracking system with file-based storage
 - **help.go**: Help system with cron expression documentation
 
 ### Dependencies
@@ -54,9 +55,10 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
 - **Help Documentation**: Comprehensive guide with examples and special characters
 
 ### History Viewing
-- **Execution Logs**: Shows job execution history from system logs
-- **Multiple Sources**: Checks systemd journal, syslog, and cron logs
-- **Formatted Display**: Clean presentation of timestamps and status
+- **Custom History Tracking**: Stores job execution history in `~/.cron_history/` directory
+- **Persistent Logs**: Each job gets its own log file with timestamp, status, and messages
+- **Multiple Sources**: Also checks systemd journal, syslog, and cron logs as fallback
+- **Formatted Display**: Clean presentation of timestamps and status with newest entries first
 
 ## Technical Implementation
 
