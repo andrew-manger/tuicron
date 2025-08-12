@@ -379,6 +379,14 @@ func (m Model) saveJob() (tea.Model, tea.Cmd) {
                 NextRun:     nextRun,
         }
 
+        // Create log file if specified
+        if job.LogFile != "" {
+                if err := CreateLogFile(job.LogFile); err != nil {
+                        m.error = fmt.Sprintf("Warning: Could not create log file: %v", err)
+                        // Continue anyway, don't block job creation
+                }
+        }
+
         // Add or update job
         if m.editing && m.editIndex >= 0 && m.editIndex < len(m.jobs) {
                 m.jobs[m.editIndex] = job

@@ -191,11 +191,71 @@ func getSampleJobs() []CronJob {
                 if nextRun, err := GetNextRunTime(jobs[i].Expression); err == nil {
                         jobs[i].NextRun = nextRun
                 }
-                // Set last run time from log file
+                // Set last run time from log file and create sample log files
                 jobs[i].LastRun = GetLastRunFromLogFile(jobs[i].LogFile)
+                
+                // Create sample log files with some example content
+                CreateSampleLogFile(jobs[i].LogFile)
         }
         
         return jobs
+}
+
+// CreateSampleLogFile creates a sample log file with example content for demo purposes
+func CreateSampleLogFile(logFile string) {
+        if logFile == "" {
+                return
+        }
+        
+        logPath := GetLogFilePath(logFile)
+        
+        // Check if file already exists
+        if _, err := os.Stat(logPath); err == nil {
+                return // File already exists
+        }
+        
+        // Ensure directory exists
+        CreateLogDir()
+        
+        // Create the file with sample entries
+        file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY, 0644)
+        if err != nil {
+                return // Fail silently for demo
+        }
+        defer file.Close()
+        
+        // Write sample log entries based on job type
+        now := time.Now()
+        var entries []string
+        
+        switch logFile {
+        case "backup":
+                entries = []string{
+                        fmt.Sprintf("%s - Starting job: /home/user/scripts/backup.sh", now.Add(-25*time.Hour).Format("2006-01-02 15:04:05")),
+                        fmt.Sprintf("%s - Backup started", now.Add(-25*time.Hour).Format("2006-01-02 15:04:05")),
+                        fmt.Sprintf("%s - Copying files...", now.Add(-25*time.Hour).Format("2006-01-02 15:04:05")),
+                        fmt.Sprintf("%s - Backup completed successfully", now.Add(-25*time.Hour).Format("2006-01-02 15:04:05")),
+                }
+        case "system_update":
+                entries = []string{
+                        fmt.Sprintf("%s - Starting job: sudo apt update && sudo apt upgrade -y", now.Add(-168*time.Hour).Format("2006-01-02 15:04:05")),
+                        fmt.Sprintf("%s - Reading package lists...", now.Add(-168*time.Hour).Format("2006-01-02 15:04:05")),
+                        fmt.Sprintf("%s - All packages are up to date", now.Add(-168*time.Hour).Format("2006-01-02 15:04:05")),
+                }
+        case "cleanup":
+                entries = []string{
+                        fmt.Sprintf("%s - Starting job: find /tmp -type f -mtime +1 -delete", now.Add(-1*time.Hour).Format("2006-01-02 15:04:05")),
+                        fmt.Sprintf("%s - Cleaned 5 temporary files", now.Add(-1*time.Hour).Format("2006-01-02 15:04:05")),
+                }
+        default:
+                entries = []string{
+                        fmt.Sprintf("%s - Log file created for cron job", now.Format("2006-01-02 15:04:05")),
+                }
+        }
+        
+        for _, entry := range entries {
+                file.WriteString(entry + "\n")
+        }
 }
 
 // GetLastRunFromLogFile reads the last timestamp from a log file
@@ -247,6 +307,37 @@ func CreateLogDir() error {
         return os.MkdirAll(logDir, 0755)
 }
 
+// CreateLogFile creates an initial log file if it doesn't exist
+func CreateLogFile(logFile string) error {
+        if logFile == "" {
+                return nil
+        }
+        
+        // Ensure log directory exists
+        if err := CreateLogDir(); err != nil {
+                return err
+        }
+        
+        logPath := GetLogFilePath(logFile)
+        
+        // Check if file already exists
+        if _, err := os.Stat(logPath); err == nil {
+                return nil // File already exists
+        }
+        
+        // Create the file with an initial entry
+        file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY, 0644)
+        if err != nil {
+                return err
+        }
+        defer file.Close()
+        
+        // Write initial log entry
+        timestamp := time.Now().Format("2006-01-02 15:04:05")
+        _, err = file.WriteString(fmt.Sprintf("%s - Log file created for cron job\n", timestamp))
+        return err
+}
+
 // GetLogFilePath returns the full path to a log file
 func GetLogFilePath(logFile string) string {
         homeDir, _ := os.UserHomeDir()
@@ -262,18 +353,31 @@ func AddLoggingToCommand(command, logFile string) string {
         homeDir, _ := os.UserHomeDir()
         logPath := fmt.Sprintf("%s/.cron_history/%s.log", homeDir, logFile)
         
-        // Add timestamp and redirect output
-        return fmt.Sprintf("echo \"$(date +'%%Y-%%m-%%d %%H:%%M:%%S') - Starting job\" >> %s && %s >> %s 2>&1", logPath, command, logPath)
+        // Add timestamp and redirect output, preserving the original command
+        return fmt.Sprintf("(echo \"$(date +'%%Y-%%m-%%d %%H:%%M:%%S') - Starting job: %s\" && %s) >> %s 2>&1", command, command, logPath)
 }
 
 // StripLoggingFromCommand removes logging redirection from a command for display
 func StripLoggingFromCommand(command string) string {
+        // Handle new format: (echo "..." && command) >> logfile 2>&1
+        if strings.HasPrefix(command, "(echo") && strings.Contains(command, "Starting job:") {
+                // Extract the command from: Starting job: actual_command"
+                startIdx := strings.Index(command, "Starting job: ")
+                if startIdx != -1 {
+                        startIdx += len("Starting job: ")
+                        endIdx := strings.Index(command[startIdx:], "\"")
+                        if endIdx != -1 {
+                                return strings.TrimSpace(command[startIdx : startIdx+endIdx])
+                        }
+                }
+        }
+        
         // Remove everything after the first >>
         if idx := strings.Index(command, " >>"); idx != -1 {
                 return strings.TrimSpace(command[:idx])
         }
         
-        // Also handle cases where logging was added at the start
+        // Also handle legacy cases where logging was added at the start
         if strings.Contains(command, "echo") && strings.Contains(command, "Starting job") {
                 // Extract the main command between "&&" statements
                 parts := strings.Split(command, " && ")
