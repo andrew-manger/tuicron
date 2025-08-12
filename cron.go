@@ -136,19 +136,29 @@ func ReadCrontab() ([]CronJob, error) {
         cmd := exec.Command("crontab", "-l")
         output, err := cmd.Output()
         if err != nil {
-                // If no crontab exists or cron is not properly configured, 
-                // return some example jobs for demonstration
-                if strings.Contains(err.Error(), "no crontab") || 
-                   strings.Contains(err.Error(), "exit status 1") {
+                // If no crontab exists, return empty slice for real crontab usage
+                if strings.Contains(err.Error(), "no crontab") {
+                        return []CronJob{}, nil
+                }
+                // For other errors (like cron not running), use sample data
+                if strings.Contains(err.Error(), "exit status 1") {
                         return getSampleJobs(), nil
                 }
-                return getSampleJobs(), nil // Return sample data instead of error
+                return getSampleJobs(), nil
         }
 
+        // Parse actual crontab content
         jobs, err := ParseCrontab(string(output))
         if err != nil {
-                return getSampleJobs(), nil // Return sample data on parse error
+                // If parsing fails but we have content, fall back to sample data
+                return getSampleJobs(), nil
         }
+        
+        // If no jobs found in crontab, show sample data for demonstration
+        if len(jobs) == 0 {
+                return getSampleJobs(), nil
+        }
+        
         return jobs, nil
 }
 

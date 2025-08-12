@@ -297,7 +297,7 @@ func (m Model) updateEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
                 return m, textinput.Blink
 
-        case "ctrl+?":
+        case "ctrl+/":
                 m.mode = ViewHelp
                 return m, nil
         }
@@ -436,8 +436,13 @@ func (m Model) viewTable() string {
                 b.WriteString("\n\n")
         }
 
-        // Table
-        b.WriteString(baseStyle.Render(m.table.View()))
+        // Center the table
+        tableView := m.table.View()
+        centeredTable := lipgloss.NewStyle().
+                Width(120).
+                Align(lipgloss.Center).
+                Render(tableView)
+        b.WriteString(baseStyle.Render(centeredTable))
         b.WriteString("\n")
 
         // Keybindings
@@ -457,12 +462,14 @@ func (m Model) viewTable() string {
 func (m Model) viewEdit() string {
         var b strings.Builder
 
-        // Title
-        title := "Add New Cron Job"
-        if m.editing {
-                title = "Edit Cron Job"
-        }
-        b.WriteString(titleStyle.Render(title))
+        // Title with purple background like in image
+        titleBox := lipgloss.NewStyle().
+                Background(lipgloss.Color("99")).
+                Foreground(lipgloss.Color("15")).
+                Padding(0, 1).
+                Bold(true).
+                Render("Edit Job")
+        b.WriteString(titleBox)
         b.WriteString("\n\n")
 
         // Error message
@@ -474,40 +481,69 @@ func (m Model) viewEdit() string {
         // Description field
         b.WriteString("Description:")
         b.WriteString("\n")
-        b.WriteString(m.inputs[0].View())
+        
+        // Style the description input with border
+        descBorderStyle := lipgloss.NewStyle().
+                Border(lipgloss.NormalBorder()).
+                BorderForeground(lipgloss.Color("240"))
+        if m.activeInput == 0 {
+                descBorderStyle = descBorderStyle.BorderForeground(lipgloss.Color("86"))
+        }
+        descInput := descBorderStyle.Width(60).Padding(0, 1).Render(m.inputs[0].View())
+        b.WriteString(descInput)
         b.WriteString("\n\n")
 
         // Cron expression field
         b.WriteString("Cron Expression:")
         b.WriteString("\n")
-        b.WriteString(m.inputs[1].View())
+        
+        // Style the cron input with border (smaller)
+        cronBorderStyle := lipgloss.NewStyle().
+                Border(lipgloss.NormalBorder()).
+                BorderForeground(lipgloss.Color("240"))
+        if m.activeInput == 1 {
+                cronBorderStyle = cronBorderStyle.BorderForeground(lipgloss.Color("86"))
+        }
+        cronInput := cronBorderStyle.Width(20).Padding(0, 1).Render(m.inputs[1].View())
         
         // Show human-readable description if expression is valid
+        cronDesc := ""
         if m.inputs[1].Value() != "" {
                 if err := ValidateCronExpression(m.inputs[1].Value()); err == nil {
                         description := ParseCronExpression(m.inputs[1].Value())
-                        b.WriteString("  ")
-                        b.WriteString(cronDescStyle.Render("(" + description + ")"))
+                        cronDesc = " → " + description
                 }
         }
+        
+        cronLine := cronInput + cronDescStyle.Render(cronDesc)
+        b.WriteString(cronLine)
         b.WriteString("\n\n")
 
         // Command field
         b.WriteString("Command:")
         b.WriteString("\n")
-        b.WriteString(m.inputs[2].View())
+        
+        // Style the command input with border
+        cmdBorderStyle := lipgloss.NewStyle().
+                Border(lipgloss.NormalBorder()).
+                BorderForeground(lipgloss.Color("240"))
+        if m.activeInput == 2 {
+                cmdBorderStyle = cmdBorderStyle.BorderForeground(lipgloss.Color("86"))
+        }
+        cmdInput := cmdBorderStyle.Width(80).Padding(0, 1).Render(m.inputs[2].View())
+        b.WriteString(cmdInput)
         b.WriteString("\n\n")
 
         // Keybindings
         keybindings := []string{
-                "Tab: navigate fields",
-                "Ctrl+S: save",
-                "Ctrl+C: cancel",
-                "Ctrl+?: help",
+                "ctrl+s: save",
+                "ctrl+c: cancel", 
+                "tab: next field",
+                "ctrl+/: cron help",
         }
         b.WriteString(keybindingStyle.Render(strings.Join(keybindings, " • ")))
 
-        return baseStyle.Render(b.String())
+        return b.String()
 }
 
 // viewHistory renders the job history view
@@ -543,8 +579,7 @@ func (m Model) viewHistory() string {
 
         // Keybindings
         keybindings := []string{
-                "Esc: back to jobs",
-                "q: back to jobs",
+                "Esc/q: back to jobs",
         }
         b.WriteString(keybindingStyle.Render(strings.Join(keybindings, " • ")))
 

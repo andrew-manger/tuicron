@@ -22,7 +22,7 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
 ## Features Implemented
 
 ### Main Interface
-- **Table View**: Displays cron jobs in a structured table with columns:
+- **Centered Table View**: Displays cron jobs in a centered, structured table with columns:
   - Description (user-provided)
   - Cron Expression 
   - Next Run Time (calculated)
@@ -39,12 +39,13 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
   - `q`: Quit application
 
 ### Edit Mode
-- **Field Navigation**: Tab/Shift+Tab to move between fields
+- **Visual Design**: Purple "Edit Job" header with bordered input fields matching terminal aesthetics
+- **Field Navigation**: Tab/Shift+Tab to move between fields with highlighted active borders
 - **Form Fields**:
-  - Description input
-  - Cron expression input with real-time human-readable translation
-  - Command input
-- **Help System**: Ctrl+? opens cron expression help
+  - Description input (wide bordered field)
+  - Cron expression input (compact field) with real-time human-readable translation displayed inline
+  - Command input (full-width bordered field)
+- **Help System**: Ctrl+/ opens cron expression help
 - **Save/Cancel**: Ctrl+S to save, Ctrl+C to cancel
 
 ### Cron Expression Features
@@ -59,11 +60,13 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
 
 ## Technical Implementation
 
-### Sample Data Mode
-When crontab is not available or cron daemon is not running (common in containerized environments), the application automatically falls back to sample data for demonstration purposes. This includes:
-- Daily backup script
-- Weekly system update
-- Hourly temp file cleanup
+### Crontab Integration & Sample Data
+- **Real Crontab Loading**: Application now loads actual crontab contents on startup, preserving jobs added outside the TUI
+- **Smart Fallback**: When crontab is empty or cron daemon is not running (common in containerized environments), displays sample data for demonstration:
+  - Daily backup script
+  - Weekly system update  
+  - Hourly temp file cleanup
+- **External Changes**: Refreshes crontab data to show jobs created by other tools
 
 ### Error Handling
 - Graceful fallback when crontab is unavailable
@@ -81,6 +84,12 @@ When crontab is not available or cron daemon is not running (common in container
 - Input Validation: Real-time with helpful error messages
 
 ## Recent Changes
+- **August 2025**: UI improvements and crontab integration
+  - Centered table display for better visual balance
+  - Redesigned edit interface with bordered fields matching terminal aesthetics
+  - Changed help shortcut from Ctrl+? to Ctrl+/ for better accessibility
+  - Improved keybinding display (combined Esc/q shortcuts)
+  - Enhanced crontab loading to preserve external changes
 - **December 2024**: Initial implementation completed
 - **Architecture**: Built modular codebase with separation of concerns
 - **UI Framework**: Implemented full Bubbletea-based interface
