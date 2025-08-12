@@ -171,9 +171,13 @@ func (m *Model) updateTable() {
                         nextRun = job.NextRun.Format("Jan 2, 15:04")
                 }
 
-                lastRun := "Never"
-                if !job.LastRun.IsZero() {
+                var lastRun string
+                if job.LogFile == "" {
+                        lastRun = "-"
+                } else if !job.LastRun.IsZero() {
                         lastRun = job.LastRun.Format("Jan 2, 15:04")
+                } else {
+                        lastRun = "Never"
                 }
 
                 // Strip logging from command for display
@@ -358,10 +362,7 @@ func (m Model) saveJob() (tea.Model, tea.Cmd) {
                 return m, nil
         }
 
-        if logFile == "" {
-                m.error = "Log file name is required"
-                return m, nil
-        }
+        // Log file is optional - leave empty for no logging
 
         if err := ValidateCronExpression(expression); err != nil {
                 m.error = fmt.Sprintf("Invalid cron expression: %v", err)
@@ -594,10 +595,17 @@ func (m Model) viewHistory() string {
         b.WriteString("\n")
         b.WriteString(helpStyle.Render(fmt.Sprintf("Command: %s", StripLoggingFromCommand(job.Command))))
         b.WriteString("\n")
-        b.WriteString(helpStyle.Render(fmt.Sprintf("Log File: ~/.cron_history/%s.log", job.LogFile)))
-        b.WriteString("\n\n")
+        if job.LogFile != "" {
+                b.WriteString(helpStyle.Render(fmt.Sprintf("Log File: ~/.cron_history/%s.log", job.LogFile)))
+                b.WriteString("\n")
+        }
+        b.WriteString("\n")
 
-        if len(m.history) == 0 {
+        if job.LogFile == "" {
+                b.WriteString(helpStyle.Render("No log file configured for this job."))
+                b.WriteString("\n")
+                b.WriteString(helpStyle.Render("Edit the job and add a log file name to enable logging."))
+        } else if len(m.history) == 0 {
                 b.WriteString(helpStyle.Render("No log entries found"))
         } else {
                 // Log entries with color coding

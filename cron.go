@@ -401,9 +401,18 @@ func WriteCrontab(jobs []CronJob) error {
                 return fmt.Errorf("failed to backup crontab: %v", err)
         }
 
-        // Ensure log directory exists
-        if err := CreateLogDir(); err != nil {
-                return fmt.Errorf("failed to create log directory: %v", err)
+        // Ensure log directory exists only if there are jobs with log files
+        hasLogFiles := false
+        for _, job := range jobs {
+                if job.LogFile != "" {
+                        hasLogFiles = true
+                        break
+                }
+        }
+        if hasLogFiles {
+                if err := CreateLogDir(); err != nil {
+                        return fmt.Errorf("failed to create log directory: %v", err)
+                }
         }
 
         var content strings.Builder
@@ -415,9 +424,14 @@ func WriteCrontab(jobs []CronJob) error {
                         content.WriteString(fmt.Sprintf("# %s\n", job.Description))
                 }
                 
-                // Add logging to the command before writing to crontab
-                commandWithLogging := AddLoggingToCommand(job.Command, job.LogFile)
-                content.WriteString(fmt.Sprintf("%s %s\n\n", job.Expression, commandWithLogging))
+                // Add logging to the command only if log file is specified
+                var finalCommand string
+                if job.LogFile != "" {
+                        finalCommand = AddLoggingToCommand(job.Command, job.LogFile)
+                } else {
+                        finalCommand = job.Command
+                }
+                content.WriteString(fmt.Sprintf("%s %s\n\n", job.Expression, finalCommand))
         }
 
         // Write to temporary file first
