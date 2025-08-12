@@ -191,9 +191,6 @@ func getSampleJobs() []CronJob {
                 jobs[i].LastRun = time.Now().Add(-24 * time.Hour)
         }
         
-        // Create sample history entries
-        CreateSampleHistory()
-        
         return jobs
 }
 

@@ -20,11 +20,6 @@ type LogEntry struct {
 
 // GetLastRunTime attempts to find the last execution time of a command
 func GetLastRunTime(command string) time.Time {
-        // First check our custom history
-        if lastRun := getLastRunFromHistory(command); !lastRun.IsZero() {
-                return lastRun
-        }
-
         // Try different approaches to find the last run time
         if lastRun := checkSystemdJournal(command); !lastRun.IsZero() {
                 return lastRun
@@ -45,12 +40,7 @@ func GetLastRunTime(command string) time.Time {
 func GetJobHistory(command string) []LogEntry {
         var entries []LogEntry
 
-        // First get our custom tracked history
-        if customEntries := getHistoryFromFile(command); len(customEntries) > 0 {
-                entries = append(entries, customEntries...)
-        }
-
-        // Try systemd journal
+        // Try systemd journal first
         if journalEntries := getSystemdJournalEntries(command); len(journalEntries) > 0 {
                 entries = append(entries, journalEntries...)
         }
