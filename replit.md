@@ -45,6 +45,7 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
   - Description input (wide bordered field)
   - Cron expression input (compact field) with real-time human-readable translation displayed inline
   - Command input (full-width bordered field)
+  - Log file input (compact field) - creates ~/.cron_history/[name].log for job output
 - **Help System**: Ctrl+/ opens cron expression help
 - **Save/Cancel**: Ctrl+S to save, Ctrl+C to cancel
 
@@ -53,20 +54,28 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
 - **Human-Readable**: Converts cron expressions to plain English
 - **Help Documentation**: Comprehensive guide with examples and special characters
 
-### History Viewing
-- **Execution Logs**: Shows job execution history from system logs
-- **Multiple Sources**: Checks systemd journal, syslog, and cron logs
-- **Formatted Display**: Clean presentation of timestamps and status
+### Log Management & History Viewing
+- **Dedicated Log Files**: Each job creates a log file in ~/.cron_history/[name].log
+- **Automatic Output Capture**: Commands are modified to capture output with timestamps
+- **Command Display**: Table shows clean commands without logging redirection
+- **Log File History**: View complete log contents with color-coded entries
+  - Green: Job start messages
+  - Orange: Warning messages  
+  - Red: Error messages
+- **Last Run Detection**: Parses log files for most recent execution timestamps
 
 ## Technical Implementation
 
-### Crontab Integration & Sample Data
-- **Real Crontab Loading**: Application now loads actual crontab contents on startup, preserving jobs added outside the TUI
-- **Smart Fallback**: When crontab is empty or cron daemon is not running (common in containerized environments), displays sample data for demonstration:
-  - Daily backup script
-  - Weekly system update  
-  - Hourly temp file cleanup
-- **External Changes**: Refreshes crontab data to show jobs created by other tools
+### Crontab Integration & Logging
+- **Real Crontab Loading**: Loads actual crontab contents on startup, preserving jobs added outside the TUI
+- **Command Processing**: Automatically adds logging redirection (`>> /path/to/logfile.log 2>&1`) to commands
+- **Smart Parsing**: Extracts clean commands and log file names from existing cron entries
+- **Log Directory Management**: Creates ~/.cron_history/ directory automatically
+- **Smart Fallback**: When crontab is empty or cron daemon not running, displays sample data with log files:
+  - Daily backup script (backup.log)
+  - Weekly system update (system_update.log)
+  - Hourly temp file cleanup (cleanup.log)
+- **External Changes**: Refreshes crontab data and log file timestamps
 
 ### Error Handling
 - Graceful fallback when crontab is unavailable
@@ -84,12 +93,19 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
 - Input Validation: Real-time with helpful error messages
 
 ## Recent Changes
-- **August 2025**: UI improvements and crontab integration
-  - Centered table display for better visual balance
-  - Redesigned edit interface with bordered fields matching terminal aesthetics
-  - Changed help shortcut from Ctrl+? to Ctrl+/ for better accessibility
-  - Improved keybinding display (combined Esc/q shortcuts)
-  - Enhanced crontab loading to preserve external changes
+- **August 2025**: Advanced logging system and UI improvements
+  - **Logging System**: Added dedicated log file field in edit mode
+    - Creates ~/.cron_history/[name].log for each job
+    - Automatically appends logging redirection to cron commands
+    - Strips logging display from table view for cleaner interface
+    - Parses log files for accurate last run timestamps
+  - **Enhanced History View**: Shows complete log file contents with color coding
+  - **UI Improvements**: 
+    - Centered table display for better visual balance
+    - Redesigned edit interface with bordered fields and log file input
+    - Changed help shortcut from Ctrl+? to Ctrl+/ for better accessibility
+    - Improved keybinding display (combined Esc/q shortcuts)
+  - **Crontab Integration**: Enhanced loading to preserve external changes
 - **December 2024**: Initial implementation completed
 - **Architecture**: Built modular codebase with separation of concerns
 - **UI Framework**: Implemented full Bubbletea-based interface
