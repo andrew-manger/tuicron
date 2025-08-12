@@ -1,4 +1,4 @@
-module tuicron
+module github.com/andrew-manger/tuicron
 
 go 1.19
 
