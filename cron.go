@@ -353,13 +353,27 @@ func AddLoggingToCommand(command, logFile string) string {
         homeDir, _ := os.UserHomeDir()
         logPath := fmt.Sprintf("%s/.cron_history/%s.log", homeDir, logFile)
         
-        // Add timestamp and redirect output, preserving the original command
-        return fmt.Sprintf("(echo \"$(date +'%%Y-%%m-%%d %%H:%%M:%%S') - Starting job\" && %s) >> %s 2>&1", command, logPath)
+        // Add timestamp and redirect output, preserving the original command  
+        // Use printf with %s to avoid quote conflicts in cron
+        return fmt.Sprintf("{ printf '%%s - Starting job\\n' \"$(date '+%%Y-%%m-%%d %%H:%%M:%%S')\" && %s; } >> %s 2>&1", command, logPath)
 }
 
 // StripLoggingFromCommand removes logging redirection from a command for display
 func StripLoggingFromCommand(command string) string {
-        // Handle new format: (echo "..." && command) >> logfile 2>&1
+        // Handle new format: { printf ... && command; } >> logfile 2>&1
+        if strings.HasPrefix(command, "{ printf") && strings.Contains(command, "Starting job") {
+                // Extract the command after "&&" and before ";"
+                andIdx := strings.Index(command, " && ")
+                if andIdx != -1 {
+                        startIdx := andIdx + 4 // Skip past " && "
+                        endIdx := strings.Index(command[startIdx:], "; } >>")
+                        if endIdx != -1 {
+                                return strings.TrimSpace(command[startIdx : startIdx+endIdx])
+                        }
+                }
+        }
+        
+        // Handle legacy format: (echo "..." && command) >> logfile 2>&1  
         if strings.HasPrefix(command, "(echo") && strings.Contains(command, "Starting job") {
                 // Extract the command after "&&" and before ">>"
                 andIdx := strings.Index(command, " && ")
