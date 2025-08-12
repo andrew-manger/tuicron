@@ -1,2 +1,42 @@
+modules = ["go"]
 [agent]
 expertMode = true
+
+[nix]
+channel = "stable-25_05"
+packages = ["cron"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "TUI Cron Manager"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "main"
+
+[[workflows.workflow]]
+name = "TUI Cron Manager"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "go mod tidy && go run ."
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "main"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "go mod tidy && go run ."
