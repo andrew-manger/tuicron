@@ -354,8 +354,8 @@ func AddLoggingToCommand(command, logFile string) string {
         logPath := fmt.Sprintf("%s/.cron_history/%s.log", homeDir, logFile)
         
         // Add timestamp and redirect output, preserving the original command  
-        // Use printf with %s to avoid quote conflicts in cron
-        return fmt.Sprintf("{ printf '%%s - Starting job\\n' \"$(date '+%%Y-%%m-%%d %%H:%%M:%%S')\" && %s; } >> %s 2>&1", command, logPath)
+        // Use printf with escaped % signs for cron compatibility
+        return fmt.Sprintf("{ printf '\\%%s - Starting job\\n' \"$(date '+\\%%Y-\\%%m-\\%%d \\%%H:\\%%M:\\%%S')\" && %s; } >> %s 2>&1", command, logPath)
 }
 
 // StripLoggingFromCommand removes logging redirection from a command for display
