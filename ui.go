@@ -18,22 +18,24 @@ const (
         ViewEdit
         ViewHistory
         ViewHelp
+        ViewDeleteConfirm
 )
 
 // Model represents the application state
 type Model struct {
-        mode        ViewMode
-        table       table.Model
-        jobs        []CronJob
-        selected    int
-        editing     bool
-        editingJob  CronJob
-        editIndex   int
-        inputs      []textinput.Model
-        activeInput int
-        history     []LogEntry
-        error       string
-        message     string
+        mode         ViewMode
+        table        table.Model
+        jobs         []CronJob
+        selected     int
+        editing      bool
+        editingJob   CronJob
+        editIndex    int
+        inputs       []textinput.Model
+        activeInput  int
+        history      []LogEntry
+        error        string
+        message      string
+        deleteChoice int // 0 = No (default), 1 = Yes
 }
 
 // Styles
@@ -218,6 +220,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
                         return m.updateHistory(msg)
                 case ViewHelp:
                         return m.updateHelp(msg)
+                case ViewDeleteConfirm:
+                        return m.updateDeleteConfirm(msg)
                 }
 
         case tea.WindowSizeMsg:
@@ -270,6 +274,16 @@ func (m Model) updateTableView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         case "r":
                 m.loadJobs()
                 m.message = "Refreshed cron jobs"
+                return m, nil
+
+        case "d":
+                if len(m.jobs) > 0 {
+                        m.selected = m.table.Cursor()
+                        if m.selected < len(m.jobs) {
+                                m.mode = ViewDeleteConfirm
+                                m.deleteChoice = 0 // Default to "No"
+                        }
+                }
                 return m, nil
         }
 
@@ -339,6 +353,52 @@ func (m Model) updateHelp(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         switch msg.String() {
         case "esc", "q":
                 m.mode = ViewEdit
+                return m, nil
+        }
+        return m, nil
+}
+
+// updateDeleteConfirm handles key presses in delete confirmation view
+func (m Model) updateDeleteConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+        switch msg.String() {
+        case "esc", "q":
+                m.mode = ViewTable
+                return m, nil
+
+        case "left", "right":
+                // Toggle between No (0) and Yes (1)
+                if m.deleteChoice == 0 {
+                        m.deleteChoice = 1
+                } else {
+                        m.deleteChoice = 0
+                }
+                return m, nil
+
+        case "enter":
+                if m.deleteChoice == 1 {
+                        // Delete the job
+                        if m.selected >= 0 && m.selected < len(m.jobs) {
+                                // Remove job from slice
+                                m.jobs = append(m.jobs[:m.selected], m.jobs[m.selected+1:]...)
+                                
+                                // Save updated crontab
+                                if err := WriteCrontab(m.jobs); err != nil {
+                                        m.error = fmt.Sprintf("Error saving crontab: %v", err)
+                                        m.mode = ViewTable
+                                        return m, nil
+                                }
+                                
+                                m.updateTable()
+                                m.message = "Job deleted successfully"
+                                
+                                // Adjust cursor if needed
+                                if m.selected >= len(m.jobs) && len(m.jobs) > 0 {
+                                        m.selected = len(m.jobs) - 1
+                                        m.table.SetCursor(m.selected)
+                                }
+                        }
+                }
+                m.mode = ViewTable
                 return m, nil
         }
         return m, nil
@@ -445,6 +505,8 @@ func (m Model) View() string {
                 return m.viewHistory()
         case ViewHelp:
                 return m.viewHelp()
+        case ViewDeleteConfirm:
+                return m.viewDeleteConfirm()
         default:
                 return "Unknown view"
         }
@@ -481,6 +543,7 @@ func (m Model) viewTable() string {
                 "n: new job",
                 "e: edit job", 
                 "h: job history",
+                "d: delete job",
                 "r: refresh",
                 "q: quit",
         }
@@ -646,4 +709,71 @@ func (m Model) viewHistory() string {
         b.WriteString(keybindingStyle.Render(strings.Join(keybindings, " • ")))
 
         return baseStyle.Render(b.String())
+}
+
+// viewDeleteConfirm renders the delete confirmation dialog
+func (m Model) viewDeleteConfirm() string {
+        var b strings.Builder
+
+        if m.selected >= len(m.jobs) {
+                return "Invalid job selection"
+        }
+
+        job := m.jobs[m.selected]
+
+        // Title
+        b.WriteString(titleStyle.Render("Delete Cron Job"))
+        b.WriteString("\n\n")
+
+        // Job summary
+        b.WriteString("Are you sure you want to delete this cron job?")
+        b.WriteString("\n\n")
+        
+        // Job details box
+        jobDetails := fmt.Sprintf("Description: %s\nCron Expression: %s (%s)\nCommand: %s",
+                job.Description,
+                job.Expression,
+                ParseCronExpression(job.Expression),
+                StripLoggingFromCommand(job.Command))
+        
+        detailsBox := lipgloss.NewStyle().
+                Border(lipgloss.NormalBorder()).
+                BorderForeground(lipgloss.Color("240")).
+                Padding(1, 2).
+                Width(80).
+                Render(jobDetails)
+        
+        b.WriteString(detailsBox)
+        b.WriteString("\n\n")
+
+        // Choice buttons
+        noStyle := lipgloss.NewStyle().
+                Border(lipgloss.NormalBorder()).
+                BorderForeground(lipgloss.Color("240")).
+                Padding(0, 2).
+                Margin(0, 1)
+        
+        yesStyle := lipgloss.NewStyle().
+                Border(lipgloss.NormalBorder()).
+                BorderForeground(lipgloss.Color("240")).
+                Padding(0, 2).
+                Margin(0, 1)
+
+        if m.deleteChoice == 0 {
+                noStyle = noStyle.BorderForeground(lipgloss.Color("46")).Bold(true)
+        } else {
+                yesStyle = yesStyle.BorderForeground(lipgloss.Color("196")).Bold(true)
+        }
+
+        noButton := noStyle.Render("No")
+        yesButton := yesStyle.Render("Yes")
+        
+        buttons := lipgloss.JoinHorizontal(lipgloss.Left, noButton, yesButton)
+        b.WriteString(buttons)
+        b.WriteString("\n\n")
+
+        // Instructions
+        b.WriteString(helpStyle.Render("Use left/right arrow keys to select • Enter to confirm • Esc/q to cancel"))
+
+        return b.String()
 }

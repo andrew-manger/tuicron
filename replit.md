@@ -35,6 +35,7 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
   - `n`: Add new cron job
   - `e`: Edit selected job
   - `h`: View execution history for selected job
+  - `d`: Delete selected job (with confirmation)
   - `r`: Refresh job list
   - `q`: Quit application
 
@@ -53,6 +54,13 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
 - **Validation**: Real-time validation of cron expressions
 - **Human-Readable**: Converts cron expressions to plain English
 - **Help Documentation**: Comprehensive guide with examples and special characters
+
+### Delete Functionality
+- **Safety-First Design**: Confirmation dialog prevents accidental deletion
+- **Job Preview**: Shows complete job details before deletion including description, cron expression (with human-readable translation), and command
+- **Default to Safe**: "No" option is selected by default to prevent accidental deletions
+- **Intuitive Navigation**: Left/right arrow keys to choose between "No" and "Yes", Enter to confirm, Esc to cancel
+- **Visual Feedback**: Clear color coding with green border for "No" and red border for "Yes" when selected
 
 ### Log Management & History Viewing
 - **Dedicated Log Files**: Each job creates a log file in ~/.cron_history/[name].log
@@ -93,7 +101,7 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
 - Input Validation: Real-time with helpful error messages
 
 ## Recent Changes
-- **August 2025**: Advanced logging system and UI improvements
+- **August 2025**: Advanced logging system, UI improvements, and delete functionality
   - **Logging System**: Added dedicated log file field in edit mode
     - Creates ~/.cron_history/[name].log for each job
     - Automatically appends logging redirection to cron commands
@@ -105,6 +113,12 @@ A terminal-based cron job manager built with Go and the Bubbletea TUI framework.
     - Redesigned edit interface with bordered fields and log file input
     - Changed help shortcut from Ctrl+? to Ctrl+/ for better accessibility
     - Improved keybinding display (combined Esc/q shortcuts)
+  - **Delete Functionality**: Added comprehensive job deletion with safety confirmation
+    - 'd' keybinding to delete selected job with confirmation dialog
+    - Safety-first design with "No" as default selection to prevent accidents
+    - Job preview shows complete details before deletion
+    - Arrow key navigation for Yes/No selection with color-coded feedback
+    - Proper crontab integration to save changes immediately
   - **Crontab Integration**: Enhanced loading to preserve external changes
 - **December 2024**: Initial implementation completed
 - **Architecture**: Built modular codebase with separation of concerns
