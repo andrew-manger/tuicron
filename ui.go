@@ -97,7 +97,7 @@ func NewModel() Model {
         t.SetStyles(s)
 
         // Create text inputs for editing
-        inputs := make([]textinput.Model, 3)
+        inputs := make([]textinput.Model, 4)
         
         // Description input
         inputs[0] = textinput.New()
@@ -117,6 +117,12 @@ func NewModel() Model {
         inputs[2].Placeholder = "/path/to/script.sh"
         inputs[2].CharLimit = 200
         inputs[2].Width = 60
+
+        // Log file input
+        inputs[3] = textinput.New()
+        inputs[3].Placeholder = "job_name"
+        inputs[3].CharLimit = 50
+        inputs[3].Width = 30
 
         m := Model{
                 mode:        ViewTable,
@@ -139,6 +145,13 @@ func (m *Model) loadJobs() {
                 return
         }
 
+        // Update last run times from log files
+        for i := range jobs {
+                if jobs[i].LogFile != "" {
+                        jobs[i].LastRun = GetLastRunFromLogFile(jobs[i].LogFile)
+                }
+        }
+
         m.jobs = jobs
         m.updateTable()
         m.error = ""
@@ -158,12 +171,17 @@ func (m *Model) updateTable() {
                         nextRun = job.NextRun.Format("Jan 2, 15:04")
                 }
 
-                lastRun := "Never"
-                if !job.LastRun.IsZero() {
+                var lastRun string
+                if job.LogFile == "" {
+                        lastRun = "-"
+                } else if !job.LastRun.IsZero() {
                         lastRun = job.LastRun.Format("Jan 2, 15:04")
+                } else {
+                        lastRun = "Never"
                 }
 
-                command := job.Command
+                // Strip logging from command for display
+                command := StripLoggingFromCommand(job.Command)
                 if len(command) > 28 {
                         command = command[:25] + "..."
                 }
@@ -244,7 +262,7 @@ func (m Model) updateTableView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                         m.selected = m.table.Cursor()
                         if m.selected < len(m.jobs) {
                                 m.mode = ViewHistory
-                                m.history = GetJobHistory(m.jobs[m.selected].Command)
+                                m.history = GetJobHistoryFromLogFile(m.jobs[m.selected].LogFile)
                         }
                 }
                 return m, nil
@@ -332,6 +350,7 @@ func (m Model) saveJob() (tea.Model, tea.Cmd) {
         description := m.inputs[0].Value()
         expression := m.inputs[1].Value()
         command := m.inputs[2].Value()
+        logFile := m.inputs[3].Value()
 
         if expression == "" {
                 m.error = "Cron expression is required"
@@ -342,6 +361,8 @@ func (m Model) saveJob() (tea.Model, tea.Cmd) {
                 m.error = "Command is required"
                 return m, nil
         }
+
+        // Log file is optional - leave empty for no logging
 
         if err := ValidateCronExpression(expression); err != nil {
                 m.error = fmt.Sprintf("Invalid cron expression: %v", err)
@@ -354,7 +375,16 @@ func (m Model) saveJob() (tea.Model, tea.Cmd) {
                 Description: description,
                 Expression:  expression,
                 Command:     command,
+                LogFile:     logFile,
                 NextRun:     nextRun,
+        }
+
+        // Create log file if specified
+        if job.LogFile != "" {
+                if err := CreateLogFile(job.LogFile); err != nil {
+                        m.error = fmt.Sprintf("Warning: Could not create log file: %v", err)
+                        // Continue anyway, don't block job creation
+                }
         }
 
         // Add or update job
@@ -395,6 +425,7 @@ func (m *Model) populateInputs() {
         m.inputs[0].SetValue(m.editingJob.Description)
         m.inputs[1].SetValue(m.editingJob.Expression)
         m.inputs[2].SetValue(m.editingJob.Command)
+        m.inputs[3].SetValue(m.editingJob.LogFile)
         
         m.activeInput = 0
         m.inputs[0].Focus()
@@ -534,6 +565,22 @@ func (m Model) viewEdit() string {
         b.WriteString(cmdInput)
         b.WriteString("\n\n")
 
+        // Log file field
+        b.WriteString("Log File:")
+        b.WriteString("\n")
+        
+        // Style the log file input with border
+        logBorderStyle := lipgloss.NewStyle().
+                Border(lipgloss.NormalBorder()).
+                BorderForeground(lipgloss.Color("240"))
+        if m.activeInput == 3 {
+                logBorderStyle = logBorderStyle.BorderForeground(lipgloss.Color("86"))
+        }
+        logInput := logBorderStyle.Width(30).Padding(0, 1).Render(m.inputs[3].View())
+        logDesc := cronDescStyle.Render(" (saved as ~/.cron_history/[name].log)")
+        b.WriteString(logInput + logDesc)
+        b.WriteString("\n\n")
+
         // Keybindings
         keybindings := []string{
                 "ctrl+s: save",
@@ -552,25 +599,40 @@ func (m Model) viewHistory() string {
 
         // Title
         job := m.jobs[m.selected]
-        b.WriteString(titleStyle.Render(fmt.Sprintf("Execution History: %s", job.Description)))
+        b.WriteString(titleStyle.Render(fmt.Sprintf("Log History: %s", job.Description)))
         b.WriteString("\n")
-        b.WriteString(helpStyle.Render(fmt.Sprintf("Command: %s", job.Command)))
-        b.WriteString("\n\n")
+        b.WriteString(helpStyle.Render(fmt.Sprintf("Command: %s", StripLoggingFromCommand(job.Command))))
+        b.WriteString("\n")
+        if job.LogFile != "" {
+                b.WriteString(helpStyle.Render(fmt.Sprintf("Log File: ~/.cron_history/%s.log", job.LogFile)))
+                b.WriteString("\n")
+        }
+        b.WriteString("\n")
 
-        if len(m.history) == 0 {
-                b.WriteString(helpStyle.Render("No execution history found"))
+        if job.LogFile == "" {
+                b.WriteString(helpStyle.Render("No log file configured for this job."))
+                b.WriteString("\n")
+                b.WriteString(helpStyle.Render("Edit the job and add a log file name to enable logging."))
+        } else if len(m.history) == 0 {
+                b.WriteString(helpStyle.Render("No log entries found"))
         } else {
-                // History entries
+                // Log entries with color coding
                 for i, entry := range m.history {
-                        if i >= 20 { // Limit display to 20 most recent entries
+                        if i >= 50 { // Show more entries since it's from log files
                                 break
                         }
 
-                        timestamp := entry.Timestamp.Format("2006-01-02 15:04:05")
-                        status := entry.Status
-                        message := entry.Message
+                        // Color code based on content
+                        line := entry.Message
+                        if strings.Contains(strings.ToLower(line), "error") {
+                                line = errorStyle.Render(line)
+                        } else if strings.Contains(strings.ToLower(line), "warning") {
+                                line = cronDescStyle.Render(line)
+                        } else if strings.Contains(line, "Starting job") {
+                                line = successStyle.Render(line)
+                        }
 
-                        b.WriteString(fmt.Sprintf("%s [%s] %s", timestamp, status, message))
+                        b.WriteString(line)
                         b.WriteString("\n")
                 }
         }
